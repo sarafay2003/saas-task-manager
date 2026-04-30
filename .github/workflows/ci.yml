@@ -1,0 +1,75 @@
+name: CI Pipeline
+
+# Trigger this pipeline on every push to main branch
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest  # GitHub runs this on a fresh Linux machine
+
+    services:
+      # Spin up a real PostgreSQL database for testing
+      db:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Step 1: Download your code onto the GitHub machine
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install your dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      # Step 4: Run your tests
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/testdb
+          SECRET_KEY: testsecretkey123
+          ALGORITHM: HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES: 30
+        run: |
+          pytest tests/ -v
+
+      # Step 5: Check code quality
+      - name: Lint with ruff
+        run: |
+          pip install ruff
+          ruff check app/
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test  # Only runs if tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 6: Build Docker image to make sure it still works
+      - name: Build Docker image
+        run: |
+          docker build -t saas-task-manager .
