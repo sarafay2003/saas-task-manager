@@ -10,12 +10,15 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
 def hash_password(password: str) -> str:
+    # Truncate to 72 bytes to avoid bcrypt limitation
+    password = password[:72]
     return pwd_context.hash(password)
 
 def verify_password(plain: str, hashed: str) -> bool:
+    plain = plain[:72]
     return pwd_context.verify(plain, hashed)
 
 def create_access_token(data: dict) -> str:
